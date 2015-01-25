@@ -1,1 +1,1 @@
-# Khan Academy
+# A testing framework for student-created Javascript code.
