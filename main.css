@@ -1,0 +1,14 @@
+#code {
+	float: left;
+}
+
+#feedbackContainer {
+	float: left;
+	margin-left: 200px;
+}
+
+.CodeMirror.cm-s-default {
+	border: 1px solid #ccc;
+	width: 400px;
+	height: 400px;
+}

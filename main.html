@@ -1,0 +1,146 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+
+	<title>Testing APIs</title>
+	<meta name="description" content="Khan Academy testing APIs">
+	<meta name="author" content="Daryl Chang">
+	<link rel="stylesheet" href="codemirror-4.12/lib/codemirror.css">
+	<link rel="stylesheet" href="main.css">
+	<link rel="stylesheet" href="bootstrap/css/bootstrap.min.css">
+
+	<!--[if lt IE 9]>
+	<script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+	<![endif]-->
+</head>
+
+<body>
+	<div id="code">
+		<h2>Code</h2>
+	</div>
+	<div id="feedbackContainer">
+		<h2>Test Results</h2>
+		<div id="feedback"></div>
+	</div>
+	<script src="codemirror-4.12/lib/codemirror.js"></script>
+	<script src="codemirror-4.12/mode/javascript/javascript.js"></script>
+	<script src="jquery-1.11.2.js"></script>
+	<script src="esprima/esprima.js"></script>
+
+	<script>
+
+		// Set up CodeMirror editor
+		var myCodeMirror = CodeMirror($('#code')[0], {
+		  value: "function myScript(){return 100;}\n",
+		  mode:  "javascript"
+		});
+
+		// Run unit tests
+		myCodeMirror.on("change", function(target) {
+			var types = [];
+			var code = target.getValue();
+			var syntax = getSyntax(code);
+			$.each(syntax, check(types));
+			$('#feedback').empty();
+
+			whitelist(['VariableDeclaration', 'ForStatement'], types);
+			blacklist(['ForInStatement'], types);
+			checkStructure({'name': 'ForStatement', 'body': {'name': 'IfStatement'}}, syntax);
+		});
+
+		// Return abstract syntax tree
+		function getSyntax(code) {
+			return esprima.parse(code);
+		}
+
+		// Record types
+		function check(types) {
+			return function checkHelper(key, value) {
+			    if (key == 'type') {
+			        types.push(value);
+			    }
+			    if (typeof value == 'object' && value){
+			    	$.each(value, check(types));
+			    }
+			}
+		}
+
+		function whitelist(reqs, types) {
+			$.each(reqs, function(index, value) {
+				if ($.inArray(value, types) != -1) {
+					$('#feedback').append("<div>Passes whitelist: " + String(value) + "</div>");
+				} else {
+					$('#feedback').append("<div>Does not pass whitelist: " + String(value) + "</div>");
+				}
+			});
+		}
+
+		function blacklist(reqs, types) {
+			$.each(reqs, function(index, value) {
+				if ($.inArray(value, types) != -1) {
+					$('#feedback').append("<div>Does not pass blacklist: " + String(value) + "</div>");
+				} else {
+					$('#feedback').append("<div>Passes blacklist: " + String(value) + "</div>");
+				}
+			});
+		}
+
+		function describeStructure(structure) {
+			var statements = [];
+			while (structure) {
+				statements.push(structure.name);
+				structure = structure.body;
+			}
+			return statements.join(' enclosing ')
+		}
+
+		function checkStructure(structure, syntax) {
+			var meetReqs = {'value': false}
+			var structureDescription = describeStructure(structure);
+			$.each(syntax.body, checkWrapper(structure, meetReqs));
+
+			if (meetReqs.value) {
+				$('#feedback').append("Meets structural requirements: " + structureDescription);
+			} else {
+				$('#feedback').append("Does not meet structural requirements: " + structureDescription);
+			}
+
+			// Use closure to pass structure requirements
+			function checkWrapper(block, meetReqs) {
+
+				// Use DFS to check if requirements are met
+				return function check(key, value){
+					if (!block) {
+						meetReqs.value = true;
+						return false;
+					}
+
+					if (typeof value == 'object' && value.length) {
+						$.each(value, checkWrapper(block, meetReqs))
+					} else if (typeof value == 'object') {
+
+						var nextVal;
+						if (value.type == 'IfStatement') {
+							nextVal = value.consequent;
+						} else if (value.type == 'ExpressionStatement') {
+							nextVal = value.expression;
+						} else {
+							nextVal = value.body;
+						}
+
+						if (typeof nextVal == 'object') {
+							if (value.type == block.name) {
+								$.each(nextVal, checkWrapper(block.body, meetReqs));
+							} else {
+								$.each(nextVal, checkWrapper(block, meetReqs));
+							}
+						}
+					}
+				}
+			}
+		}
+	</script>
+</body>
+</html>
